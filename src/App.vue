@@ -96,14 +96,13 @@
           <div
             v-for="t in tickers"
             :key="t"
-            @click="selectedTicker = t"
+            @click="select(t)"
             :class="{
               'border-4': selectedTicker === t
             }"
             class="bg-white overflow-hidden shadow rounded-lg border-purple-800 border-solid cursor-pointer"
           >
             <div class="px-4 py-5 sm:p-6 text-center">
-              {{ selectedTicker }}
               <dt class="text-sm font-medium text-gray-500 truncate">
                 {{ t.name }} - USD
               </dt>
@@ -140,10 +139,12 @@
           {{ selectedTicker.name }}- USD
         </h3>
         <div class="flex items-end border-gray-600 border-b border-l h-64">
-          <div class="bg-purple-800 border w-10 h-24"></div>
-          <div class="bg-purple-800 border w-10 h-32"></div>
-          <div class="bg-purple-800 border w-10 h-48"></div>
-          <div class="bg-purple-800 border w-10 h-16"></div>
+          <div
+            v-for="(bar, idx) in normalizeGraph()"
+            :key="idx"
+            :style="{ height: `${bar}%` }"
+            class="bg-purple-800 border w-10"
+          ></div>
         </div>
         <button
           type="button"
@@ -182,27 +183,49 @@ export default {
 
   data() {
     return {
-      selectedTicker: "",
-      ticker: "default",
-      tickers: [
-        { name: "ATC", price: 100 },
-        { name: "BTC", price: 200 },
-        { name: "CTC", price: 300 }
-      ]
+      selectedTicker: null,
+      ticker: "BTC",
+      tickers: [],
+      graph: []
     }
   },
 
   methods: {
     add() {
-      const newTicker = {
+      const currentTicker = {
         name: this.ticker,
-        price: "1000"
+        price: "-"
       }
-      this.tickers.push(newTicker)
-      this.ticker = null
+      this.tickers.push(currentTicker)
+      setInterval(async () => {
+        const f = await fetch(
+          `https://min-api.cryptocompare.com/data/price?fsym=${currentTicker.name}&tsyms=USD&api_key=fcd970167702bf53687009cdaa2e462fc906bf7982b89ccc10e31272e65c28df`
+        )
+        const data = await f.json()
+
+        this.tickers.find((t) => t.name === currentTicker.name).price =
+          data.USD > 1 ? data.USD.toFixed(2) : data.USD.toPrecision(2)
+
+        if (this.selectedTicker?.name === currentTicker.name) {
+          this.graph.push(data.USD)
+        }
+      }, 2000)
+      this.ticker = ""
+    },
+
+    select(ticker) {
+      this.selectedTicker = ticker
+      this.graph = []
     },
     handleDelete(tickerToRemove) {
       this.tickers = this.tickers.filter((value) => value != tickerToRemove)
+    },
+    normalizeGraph() {
+      const maxValue = Math.max(...this.graph)
+      const minValue = Math.min(...this.graph)
+      return this.graph.map(
+        (price) => ((price - minValue) * 95) / (maxValue - minValue)
+      )
     }
   }
 }
